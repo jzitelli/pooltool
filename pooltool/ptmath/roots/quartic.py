@@ -1,13 +1,14 @@
 from typing import Callable, Dict, Tuple
 
 import numpy as np
-from numba import jit
+from numba import jit, objmode
 from numpy.typing import NDArray
 
 import pooltool.constants as const
 from pooltool.ptmath.roots.core import (
     get_real_positive_smallest_roots,
 )
+from pooltool.ptmath.roots.poly_solvers import quartic_solve
 from pooltool.utils.strenum import StrEnum, auto
 
 
@@ -215,6 +216,10 @@ def numeric(p: NDArray[np.complex128]) -> NDArray[np.complex128]:
 
 @jit(nopython=True, cache=const.use_numba_cache)
 def analytic(p: NDArray[np.complex128]) -> NDArray[np.complex128]:
+    with objmode(result="complex128[:]"):
+        result = quartic_solve(p)
+    return result
+
     """Calculate a quartic's roots using the closed-form solution
 
     This function was created with the help of sympy.
