@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from bisect import bisect
+from collections import defaultdict
 from typing import Any, Dict, Iterator, List, Optional
 
 import numpy as np
@@ -25,7 +27,7 @@ def _convert_balls(balls: Any) -> Dict[str, Ball]:
     return {ball.id: ball for ball in balls}
 
 
-@define
+@define(slots=False)
 class System:
     """A class representing the billiards system.
 
@@ -199,6 +201,13 @@ class System:
 
         self.events.append(event)
 
+        from pooltool import EventType
+        if not hasattr(self, 'ball_events'):
+            self.ball_events = defaultdict(list)
+        if event.event_type in (EventType.SLIDING_ROLLING, EventType.ROLLING_SPINNING, EventType.ROLLING_STATIONARY,
+                                EventType.SPINNING_STATIONARY):
+            self.ball_events[event.agents[0].id].append(event)
+
     def reset_history(self):
         """Resets the history for all balls, clearing events and resetting time.
 
@@ -227,6 +236,7 @@ class System:
             ball.state.t = 0.0
 
         self.events = []
+        self.ball_events = defaultdict(list)
 
     def reset_balls(self):
         """Resets balls to their initial states based on their history
@@ -309,6 +319,26 @@ class System:
             )
 
         return energy
+
+    def calc_ball_states(self, t: float):
+        from pooltool.physics.evolve import evolve_ball_motion
+        result = {}
+        rvws = np.zeros((len(self.ball_events), 3, 3), dtype=np.float64)
+        for i, (ball_id, events) in enumerate(self.ball_events.items()):
+            result[ball_id] = rvws[i]
+            ie = bisect(events, t, key=lambda e: e.time)
+            if ie == 0:
+                # rvws[i] = self.balls[ball_id].history[0].rvw
+                continue
+            event = events[ie - 1]
+            agent = event.agents[0]
+            state = agent.initial.state
+            params = agent.initial.params
+            rvws[i], _ = evolve_ball_motion(state.s, state.rvw,
+                                            params.R, params.m, params.u_s, params.u_sp, params.u_r, params.g,
+                                            t - event.time)
+            result[ball_id] = rvws[i]
+        return result
 
     def randomize_positions(
         self, ball_ids: Optional[List[str]] = None, niter=100
