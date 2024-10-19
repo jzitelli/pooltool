@@ -11,7 +11,7 @@ from attrs import define, field
 
 import pooltool.constants as const
 import pooltool.ptmath as ptmath
-from pooltool.events.datatypes import Event, EventType
+from pooltool.events.datatypes import AgentType, Event, EventType
 from pooltool.objects.ball.datatypes import Ball, BallHistory
 from pooltool.objects.ball.sets import BallSet
 from pooltool.objects.cue.datatypes import Cue
@@ -205,8 +205,9 @@ class System:
             self.ball_events = defaultdict(list)
         if event.event_type in (EventType.SLIDING_ROLLING, EventType.ROLLING_SPINNING, EventType.ROLLING_STATIONARY,
                                 EventType.SPINNING_STATIONARY, EventType.BALL_POCKET, EventType.BALL_LINEAR_CUSHION,
-                                EventType.BALL_CIRCULAR_CUSHION):
-            self.ball_events[event.agents[0].id].append(event)
+                                EventType.BALL_CIRCULAR_CUSHION, EventType.STICK_BALL):
+            agent = next(a for a in event.agents if a.agent_type == AgentType.BALL)
+            self.ball_events[agent.id].append(event)
         elif event.event_type in (EventType.BALL_BALL, ):
             a, b = event.agents
             self.ball_events[a.id].append(event)
@@ -336,7 +337,8 @@ class System:
                 continue
             event = events[ie - 1]
             agent = next(a for a in event.agents if a.id == ball_id)
-            if event.event_type in (EventType.BALL_BALL, EventType.BALL_LINEAR_CUSHION):
+            if event.event_type in (EventType.BALL_BALL, EventType.BALL_LINEAR_CUSHION, EventType.BALL_CIRCULAR_CUSHION,
+                                    EventType.BALL_POCKET, EventType.STICK_BALL):
                 state = agent.final.state
                 params = agent.final.params
             else:
