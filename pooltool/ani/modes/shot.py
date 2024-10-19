@@ -2,6 +2,8 @@
 
 from typing import Optional
 
+import numpy as np
+
 import pooltool.ani as ani
 import pooltool.ani.tasks as tasks
 from pooltool.ani.action import Action
@@ -54,14 +56,13 @@ class ShotMode(BaseMode):
             If True, the shot animations are built with visual.build_shot_animation.
         """
         mouse.mode(MouseMode.RELATIVE)
+        # if build_animations:
+        #     visual.build_shot_animation()
+        #     visual.animate(PlaybackMode.SINGLE)
+        #     visual.advance_to_end_of_stroke()
 
-        if build_animations:
-            visual.build_shot_animation()
-            visual.animate(PlaybackMode.SINGLE)
-            visual.advance_to_end_of_stroke()
-
-        if playback_mode is not None:
-            visual.animate(playback_mode)
+        # if playback_mode is not None:
+        #     visual.animate(playback_mode)
 
         hud.update_cue(multisystem.active.cue)
 
@@ -99,8 +100,13 @@ class ShotMode(BaseMode):
         self.register_keymap_event("p-up", Action.prev_shot, True)
         self.register_keymap_event("enter-up", Action.parallel, True)
 
+        self.lt = 0.0
+        self.t = 0.0
+        self.pt = 0.0
+        for b in visual.balls.values():
+            b.nodes["pos"].setQuat(b.nodes["pos"].getQuat().identQuat())
         tasks.add(self.shot_view_task, "shot_view_task")
-        tasks.add(self.shot_animation_task, "shot_animation_task")
+        # tasks.add(self.shot_animation_task, "shot_animation_task")
         tasks.add(self.shared_task, "shared_task")
 
     def exit(self, key="soft"):
@@ -169,6 +175,7 @@ class ShotMode(BaseMode):
             hud.update_cue(multisystem.active.cue)
 
         elif key == "reset":
+            self.pt = 0.0
             if multisystem.active_index != len(multisystem) - 1:
                 # Replaying shot that is not most recent. Teardown and then buildup most
                 # recent
@@ -220,6 +227,32 @@ class ShotMode(BaseMode):
             # We didn't do anything this frame, but touch the mouse so any future mouse
             # movements don't experience a big jump
             mouse.touch()
+
+        t = task.time
+        self.lt = self.t
+        self.t = t
+        dt = t - self.lt
+        dt *= visual.playback_speed
+        self.pt += dt
+
+        if self.keymap[Action.restart_ani]:
+            self.pt = 0
+
+        endt = multisystem[-1].events[-1].time + 1
+        while self.pt > endt:
+            self.pt -= endt
+        rvws = multisystem[-1].calc_ball_states(self.pt)
+        for ball_id, rvw in rvws.items():
+            w = rvw[2]
+            q = visual.balls[ball_id].nodes["pos"].getQuat()
+            q_w = q[0]
+            # assert q_w == q.getR()
+            q_ijk = np.array((q[1], q[2], q[3]))
+            q[0] -= 0.5 * dt * w.dot(q_ijk)
+            q_ijk += 0.5 * dt * (q_w * w + np.cross(w, q_ijk))
+            q[1], q[2], q[3] = q_ijk[0], q_ijk[1], q_ijk[2]
+            q.normalize()
+            visual.balls[ball_id].set_render_state(rvw[0], quat=q)
 
         return task.cont
 

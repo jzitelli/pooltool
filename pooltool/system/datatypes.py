@@ -11,7 +11,7 @@ from attrs import define, field
 
 import pooltool.constants as const
 import pooltool.ptmath as ptmath
-from pooltool.events import Event
+from pooltool.events.datatypes import Event, EventType
 from pooltool.objects.ball.datatypes import Ball, BallHistory
 from pooltool.objects.ball.sets import BallSet
 from pooltool.objects.cue.datatypes import Cue
@@ -201,12 +201,16 @@ class System:
 
         self.events.append(event)
 
-        from pooltool import EventType
         if not hasattr(self, 'ball_events'):
             self.ball_events = defaultdict(list)
         if event.event_type in (EventType.SLIDING_ROLLING, EventType.ROLLING_SPINNING, EventType.ROLLING_STATIONARY,
-                                EventType.SPINNING_STATIONARY):
+                                EventType.SPINNING_STATIONARY, EventType.BALL_POCKET, EventType.BALL_LINEAR_CUSHION,
+                                EventType.BALL_CIRCULAR_CUSHION):
             self.ball_events[event.agents[0].id].append(event)
+        elif event.event_type in (EventType.BALL_BALL, ):
+            a, b = event.agents
+            self.ball_events[a.id].append(event)
+            self.ball_events[b.id].append(event)
 
     def reset_history(self):
         """Resets the history for all balls, clearing events and resetting time.
@@ -328,16 +332,20 @@ class System:
             result[ball_id] = rvws[i]
             ie = bisect(events, t, key=lambda e: e.time)
             if ie == 0:
-                # rvws[i] = self.balls[ball_id].history[0].rvw
+                rvws[i] = self.balls[ball_id].history[0].rvw
                 continue
             event = events[ie - 1]
-            agent = event.agents[0]
-            state = agent.initial.state
-            params = agent.initial.params
+            agent = next(a for a in event.agents if a.id == ball_id)
+            if event.event_type in (EventType.BALL_BALL, EventType.BALL_LINEAR_CUSHION):
+                state = agent.final.state
+                params = agent.final.params
+            else:
+                state = agent.initial.state
+                params = agent.initial.params
             rvws[i], _ = evolve_ball_motion(state.s, state.rvw,
                                             params.R, params.m, params.u_s, params.u_sp, params.u_r, params.g,
                                             t - event.time)
-            result[ball_id] = rvws[i]
+            # result[ball_id] = rvws[i]
         return result
 
     def randomize_positions(

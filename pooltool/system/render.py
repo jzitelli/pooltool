@@ -164,25 +164,25 @@ class SystemController:
         self.change_speed(2.0)
 
     def change_speed(self, factor):
-        curr_time = self.shot_animation.get_t()
+        # curr_time = self.shot_animation.get_t()
 
-        self.reset_animation(reset_pause=False)
+        # self.reset_animation(reset_pause=False)
         self.playback_speed *= factor
 
         # Recontinuize to adjust for change in speed
-        continuize(multisystem.active, dt=0.01 * self.playback_speed, inplace=True)
+        # continuize(multisystem.active, dt=0.01 * self.playback_speed, inplace=True)
 
-        self.build_shot_animation()
+        # self.build_shot_animation()
 
-        self.shot_animation.setPlayRate(factor * self.shot_animation.getPlayRate())
+        # self.shot_animation.setPlayRate(factor * self.shot_animation.getPlayRate())
 
-        if self.paused:
-            self.animate(PlaybackMode.LOOP)
-            self.pause_animation()
-        else:
-            self.animate(PlaybackMode.LOOP)
-
-        self.shot_animation.set_t(curr_time / factor)
+        # if self.paused:
+        #     self.animate(PlaybackMode.LOOP)
+        #     self.pause_animation()
+        # else:
+        #     self.animate(PlaybackMode.LOOP)
+        #
+        # self.shot_animation.set_t(curr_time / factor)
 
     def offset_time(self, dt) -> None:
         old_t = self.shot_animation.get_t()
